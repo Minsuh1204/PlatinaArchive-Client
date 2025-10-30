@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 import json
 import os
 import sys
@@ -7,6 +8,7 @@ import time
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
+import easyocr
 import imagehash
 import pytesseract
 import requests
@@ -21,6 +23,8 @@ if getattr(sys, "frozen", False):
 else:
     BASEDIR = os.path.dirname(os.path.abspath(__file__))
 os.environ["TESSDATA_PREFIX"] = os.path.join(BASEDIR, "tesseract", "tessdata")
+APPDATA_ROAMING = os.environ.get("APPDATA", os.path.expanduser("~"))
+EASYOCR_DIR = os.path.join(BASEDIR, "easyocr")
 
 # --- CONFIGURATION CONSTANTS ---
 # Use one dictionary for all ROI ratios for better maintainability.
@@ -82,6 +86,10 @@ class ScreenshotAnalyzer:
     """
 
     def __init__(self, song_database: list[Song]):
+        # Initialize EasyOCR
+        self.reader = easyocr.Reader(
+            ["en"], model_storage_directory=EASYOCR_DIR, gpu=False
+        )
         tesseract_exe_path = os.path.join(BASEDIR, "tesseract", "tesseract.exe")
         pytesseract.pytesseract.tesseract_cmd = tesseract_exe_path
         self.song_db: dict[int, Song] = {song.id: song for song in song_database}
@@ -148,7 +156,6 @@ class ScreenshotAnalyzer:
 
     @staticmethod
     def is_pivot_pixel(rgb: tuple[int, int, int]):
-        # easy
         if abs(rgb[0] - 231) < 5 and abs(rgb[1] - 136) < 5 and abs(rgb[2] - 40) < 5:
             return "EASY"
         elif abs(rgb[0] - 234) < 5 and abs(rgb[1] - 98) < 5 and abs(rgb[2] - 124) < 5:
@@ -159,6 +166,12 @@ class ScreenshotAnalyzer:
             return "PLUS"
         else:
             return None
+
+    @staticmethod
+    def img_to_bin(img: Image.Image) -> bytes:
+        bytes_stream = BytesIO()
+        img.save(bytes_stream, format="PNG")
+        return bytes_stream.getvalue()
 
     def _analyze_select_screen(self, img: Image.Image) -> AnalysisReport:
         screen_type = "SELECT"
@@ -178,26 +191,30 @@ class ScreenshotAnalyzer:
             )
 
         # 2. Extract Lines and Base Difficulty Color (if available on select screen)
-        line = self._crop_and_ocr(img, screen_type, "line", self.get_ocr_line)
-        score = self._crop_and_ocr(img, screen_type, "score", self.get_ocr_integer)
+        line = self._crop_and_ocr(img, screen_type, "line", self.get_easyocr_line)
+        score = self._crop_and_ocr(img, screen_type, "score", self.get_easyocr_int)
         major_patch = self._crop_and_ocr(
-            img, screen_type, "major_patch", self.get_ocr_select_major_patch
+            img, screen_type, "major_patch", self.get_easyocr_int
         )
         minor_patch = self._crop_and_ocr(
-            img, screen_type, "minor_patch", self.get_ocr_select_minor_patch
+            img, screen_type, "minor_patch", self.get_easyocr_int
         )
         if minor_patch < 10:
             minor_patch = f"0{minor_patch}"
         patch = float(f"{major_patch}.{minor_patch}")
 
         major_judge = self._crop_and_ocr(
-            img, screen_type, "major_judge", self.get_ocr_integer
+            img, screen_type, "major_judge", self.get_easyocr_int
         )
         minor_judge = self._crop_and_ocr(
-            img, screen_type, "minor_judge", self.get_ocr_select_minor_judge
+            img, screen_type, "minor_judge", self.get_easyocr_int
         )
         minor_judge = "0" * (4 - len(str(minor_judge))) + str(minor_judge)
         judge = float(f"{major_judge}.{minor_judge}")
+
+        if patch == 0:
+            score = 0
+            judge = 0
 
         is_full_combo = False
         is_perfect_decode = False
@@ -228,7 +245,7 @@ class ScreenshotAnalyzer:
                 level_crop = img.crop(level_abs_coords)
                 level_crop = self.ocr_preprocess(level_crop, do_invert=True)
                 # level_crop.show()
-                level = self.get_ocr_integer(level_crop)
+                level = self.get_easyocr_int(level_crop)
                 print(f"OCRed Level: {level}")
                 available_levels = matched_song.get_available_levels(line, difficulty)
                 if len(available_levels) == 1:
@@ -356,6 +373,33 @@ class ScreenshotAnalyzer:
                 min_distance = distance
                 best_match_song = song_obj
         return best_match_song, min_distance
+
+    def get_easyocr_line(self, img: Image.Image, **kwargs) -> Literal[4, 6]:
+        result = self.reader.readtext(
+            self.img_to_bin(img), detail=0, allowlist="46LINES"
+        )[0]
+        int_result = ""
+        for r in result:
+            if r in "46":
+                int_result += r
+        return int(int_result)
+
+    def get_easyocr_float(self, img: Image.Image, **kwargs) -> float:
+        result = self.reader.readtext(
+            self.img_to_bin(img), detail=0, allowlist="0123456789."
+        )[0]
+        try:
+            return float(result)
+        except ValueError:
+            return -1
+
+    def get_easyocr_int(self, img: Image.Image, **kwargs) -> int:
+        result: str = self.reader.readtext(
+            self.img_to_bin(img), detail=0, allowlist="0123456789"
+        )[0]
+        if result.isdigit():
+            return int(result)
+        return -1
 
     @staticmethod
     def get_ocr_judge(img_crop: Image.Image) -> float:
@@ -644,7 +688,7 @@ class ScreenshotAnalyzer:
                 img = Image.open(image_path)
             else:
                 # Try to read image from clipboard
-                img = ImageGrab.grabclipboard()
+                img: Image.Image = ImageGrab.grabclipboard()
         except FileNotFoundError:
             print(f"Error: File not found at {image_path}")
             return AnalysisReport(song_name="FILE NOT FOUND")
@@ -666,31 +710,25 @@ class ScreenshotAnalyzer:
         matched_song, match_distance = self.get_best_match_song(jacket_hash)
 
         # --- 2. OCR Extraction ---
-        # Note: 'good' corresponds to the 'good' count in the stats.
-
-        judge_rate_ocr = self._crop_and_ocr(
-            img, screen_type, "judge", self.get_ocr_judge
-        )
-        lines = self._crop_and_ocr(img, screen_type, "line", self.get_ocr_line)
+        lines = self._crop_and_ocr(img, screen_type, "line", self.get_easyocr_int)
         level_ocr = self._crop_and_ocr(
-            img, screen_type, "level", self.get_ocr_integer, do_invert=True
+            img, screen_type, "level", self.get_easyocr_int, do_invert=True
         )
         patch_ocr = self._crop_and_ocr(
-            img, screen_type, "patch", self.get_ocr_patch, do_invert=True
+            img, screen_type, "patch", self.get_easyocr_float, do_invert=True
         )
-        score_ocr = self._crop_and_ocr(img, screen_type, "score", self.get_ocr_integer)
         total_notes = self._crop_and_ocr(
-            img, screen_type, "total_notes", self.get_ocr_integer
+            img, screen_type, "total_notes", self.get_easyocr_int
         )
         perfect_high = self._crop_and_ocr(
-            img, screen_type, "perfect_high_y", self.get_ocr_integer
+            img, screen_type, "perfect_high_y", self.get_easyocr_int
         )
         perfect = self._crop_and_ocr(
-            img, screen_type, "perfect_y", self.get_ocr_integer
+            img, screen_type, "perfect_y", self.get_easyocr_int
         )
-        great = self._crop_and_ocr(img, screen_type, "great_y", self.get_ocr_integer)
-        good = self._crop_and_ocr(img, screen_type, "good_y", self.get_ocr_integer)
-        miss = self._crop_and_ocr(img, screen_type, "miss_y", self.get_ocr_integer)
+        great = self._crop_and_ocr(img, screen_type, "great_y", self.get_easyocr_int)
+        good = self._crop_and_ocr(img, screen_type, "good_y", self.get_easyocr_int)
+        miss = self._crop_and_ocr(img, screen_type, "miss_y", self.get_easyocr_int)
         rank_crop = self._crop_and_ocr(
             img, screen_type, "rank", lambda x: x, no_preprocess=True
         )
@@ -816,7 +854,6 @@ def fetch_songs():
 
     # check local storage
     DEFAULT_DATE = datetime(2025, 4, 10).isoformat()  # Date that needs update
-    APPDATA_ROAMING = os.environ.get("APPDATA", os.path.expanduser("~"))
     CACHE_DIR = os.path.join(APPDATA_ROAMING, "PLATiNA-ARCHiVE", "cache")
     CACHED_DB_PATH = os.path.join(CACHE_DIR, "db.json")
     songs_headers = {}

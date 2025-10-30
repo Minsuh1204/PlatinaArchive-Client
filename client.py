@@ -23,7 +23,8 @@ from analyzer import (
 from login import RegisterWindow, _check_local_key, load_key_from_file
 from models import AnalysisReport, DecodeResult
 
-VERSION = (0, 2, 5)
+DEBUG_MODE = True
+VERSION = (0, 3, 0)
 current_version_str = version_to_string(VERSION)
 if getattr(sys, "frozen", False):
     BASEDIR = os.path.dirname(sys.executable)
@@ -350,7 +351,10 @@ class PlatinaArchiveClient:
             "X-API-Key": self.api_key,
             "Content-Type": "application/json",
         }
-        requests.post(update_archive_endpoint, json=new_archive.json(), headers=headers)
+        if not DEBUG_MODE:  # If debug mode is on, do NOT update the acutal DB
+            requests.post(
+                update_archive_endpoint, json=new_archive.json(), headers=headers
+            )
         # update internal archive
         archive_key = f"{new_archive.song.id}|{new_archive.line}|{new_archive.difficulty}|{new_archive.level}"
         internal_archive = self.archive.get(

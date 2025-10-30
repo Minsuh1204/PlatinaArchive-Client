@@ -10,6 +10,8 @@ example/
 # tesseract binary
 tesseract/
 
+easyocr/
+
 # Environment file
 .env
 
