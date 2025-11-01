@@ -34,7 +34,7 @@ else:
 class PlatinaArchiveClient:
     def __init__(self, app):
         self.app = app
-        app.title(f"PLATiNA::ARCHIVE Client {current_version_str}")
+        app.title(f"PLATiNA-ARCHIVE Client {current_version_str}")
         app.geometry("800x600")
         app.resizable(False, False)
 
