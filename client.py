@@ -20,10 +20,10 @@ from analyzer import (
     fetch_latest_client_version,
     version_to_string,
 )
-from login import RegisterWindow, _check_local_key, load_key_from_file
+from login import RegisterWindow, _check_local_key, LoginWindow
 from models import AnalysisReport, DecodeResult, ArchiveException
 
-VERSION = (0, 2, 5)
+VERSION = (0, 3, 0)
 current_version_str = version_to_string(VERSION)
 if getattr(sys, "frozen", False):
     BASEDIR = os.path.dirname(sys.executable)
@@ -51,7 +51,7 @@ class PlatinaArchiveClient:
         self.analyzer = None
         self.archive = None
         self.decoder_name = None
-        self.api_key = _check_local_key() or load_key_from_file()
+        self.api_key = _check_local_key()
 
         self.top_frame = ttk.Frame(app, style="Top.TFrame")
         self.top_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
@@ -156,11 +156,14 @@ class PlatinaArchiveClient:
             self.log_message("클라이언트가 최신 버전입니다.")
 
         if not self.api_key:
-            messagebox.showinfo(
-                "플라티나 아카이브 등록",
-                "새로운 디코더를 발견 했습니다, 이름과 비밀번호를 설정해주세요.",
-            )
-            RegisterWindow(self.app, self._handle_successful_register)
+            if messagebox.askyesno(
+                "PLATiNA-ARCHiVE 로그인 / 등록",
+                "계정 정보가 등록되어 있지 않습니다, 새로운 디코더로 등록하시겠습니까? (아니오 선택시 로그인 창으로 이동됩니다.)",
+            ):
+                RegisterWindow(self.app, self._handle_successful_register)
+            else:
+                LoginWindow(self.app, self._handle_successful_login)
+
         else:
             self.decoder_name = self.api_key.split("::")[0]
             self.log_message(f"{self.decoder_name}님, 환영합니다.")
@@ -172,6 +175,12 @@ class PlatinaArchiveClient:
         self.api_key = api_key
         self.archive = fetch_archive(self.api_key)
         self.log_message(f"등록 성공. 환영합니다, {name}님.")
+
+    def _handle_successful_login(self, name: str, api_key: str):
+        self.decoder_name = name
+        self.api_key = api_key
+        self.archive = fetch_archive(self.api_key)
+        self.log_message(f"로그인 성공. 돌아오신걸 환영합니다, {name}님.")
 
     def _setup_global_hotkey(self):
         """Setup the global hotkey <Alt+Insert>"""
