@@ -7,6 +7,14 @@ from imagehash import ImageHash
 from PIL import Image
 
 
+class ArchiveException(Exception):
+    def __init__(self, msg: str):
+        self.msg = msg
+
+    def __str__(self):
+        return f"Error: {self.msg}"
+
+
 class DecodeResult:
     def __init__(
         self,

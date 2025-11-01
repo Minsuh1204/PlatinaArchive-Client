@@ -21,7 +21,7 @@ from analyzer import (
     version_to_string,
 )
 from login import RegisterWindow, _check_local_key, load_key_from_file
-from models import AnalysisReport, DecodeResult
+from models import AnalysisReport, DecodeResult, ArchiveException
 
 VERSION = (0, 2, 5)
 current_version_str = version_to_string(VERSION)
@@ -123,6 +123,8 @@ class PlatinaArchiveClient:
             bg="#F0F0F0",
             fg="black",
         )
+        self.log_text.tag_config("general", foreground="black")
+        self.log_text.tag_config("error", foreground="red")
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.log_scrollbar = ttk.Scrollbar(self.log_frame, command=self.log_text.yview)
@@ -188,10 +190,13 @@ class PlatinaArchiveClient:
     def _execute_analysis(self):
         """Run the analysis"""
         self.log_message("Hotkey detected...")
-        report = self.analyzer.extract_info()
-        self.app.after(
-            0, self.update_display, report
-        )  # Use tkinter's after method to ensure display update is on the main thread
+        try:
+            report = self.analyzer.extract_info()
+            self.app.after(
+                0, self.update_display, report
+            )  # Use tkinter's after method to ensure display update is on the main thread
+        except ArchiveException as e:
+            self.log_error(e)
 
     def load_db(self):
         # Fetch song data
@@ -207,7 +212,13 @@ class PlatinaArchiveClient:
     def log_message(self, msg):
         now = datetime.now()
         structured_time = f"[{now.hour:02d}:{now.minute:02d}:{now.second:02d}] "
-        self.log_text.insert(tk.END, structured_time + msg + "\n")
+        self.log_text.insert(tk.END, structured_time + msg + "\n", "general")
+        self.log_text.see(tk.END)
+
+    def log_error(self, err: ArchiveException):
+        now = datetime.now()
+        structured_time = f"[{now.hour:02d}:{now.minute:02d}:{now.second:02d}] "
+        self.log_text.insert(tk.END, structured_time + str(err) + "\n", "error")
         self.log_text.see(tk.END)
 
     def update_display(self, report: AnalysisReport):
@@ -383,8 +394,11 @@ class PlatinaArchiveClient:
 
     def run_analysis(self, event=None):
         self.log_message("Reading clipboard for image...")
-        report = self.analyzer.extract_info()
-        self.update_display(report)
+        try:
+            report = self.analyzer.extract_info()
+            self.update_display(report)
+        except ArchiveException as e:
+            self.log_error(e)
 
 
 if __name__ == "__main__":

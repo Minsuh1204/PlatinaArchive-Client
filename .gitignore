@@ -7,8 +7,9 @@ __pycache__/
 # example image files
 example/
 
-# tesseract binary
+# tesseract binary + easyocr
 tesseract/
+easyocr/
 
 # Environment file
 .env

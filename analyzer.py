@@ -14,7 +14,7 @@ from PIL import Image, ImageGrab, ImageOps
 
 # Assuming these are correctly defined in models.py with the 'self' fix
 # and AnalysisReport is a simple data class for results.
-from models import AnalysisReport, DecodeResult, Pattern, Song
+from models import AnalysisReport, DecodeResult, Pattern, Song, ArchiveException
 
 if getattr(sys, "frozen", False):
     BASEDIR = os.path.dirname(sys.executable)
@@ -170,11 +170,9 @@ class ScreenshotAnalyzer:
         jacket_hash = imagehash.phash(jacket_crop)
         matched_song, match_distance = self.get_best_match_song(jacket_hash)
 
-        if not matched_song:
-            return AnalysisReport(
-                song_name="UNKNOWN SONG (SELECT)",
-                jacket_image=jacket_crop,
-                match_distance=match_distance,
+        if match_distance > 5:
+            raise ArchiveException(
+                "노래 재킷 인식 실패. 인식할 수 없는 화면이거나 노래가 아직 DB에 등록되지 않았습니다."
             )
 
         # 2. Extract Lines and Base Difficulty Color (if available on select screen)
@@ -664,13 +662,13 @@ class ScreenshotAnalyzer:
         )  # Pass crop back as PIL Image
         jacket_hash = imagehash.phash(jacket_crop)
         matched_song, match_distance = self.get_best_match_song(jacket_hash)
+        if match_distance > 5:
+            raise ArchiveException(
+                "노래 재킷 인식 실패. 인식할 수 없는 화면이거나 노래가 아직 DB에 등록되지 않았습니다."
+            )
 
         # --- 2. OCR Extraction ---
-        # Note: 'good' corresponds to the 'good' count in the stats.
 
-        judge_rate_ocr = self._crop_and_ocr(
-            img, screen_type, "judge", self.get_ocr_judge
-        )
         lines = self._crop_and_ocr(img, screen_type, "line", self.get_ocr_line)
         level_ocr = self._crop_and_ocr(
             img, screen_type, "level", self.get_ocr_integer, do_invert=True
