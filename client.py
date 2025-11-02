@@ -20,10 +20,10 @@ from analyzer import (
     fetch_latest_client_version,
     version_to_string,
 )
-from login import RegisterWindow, _check_local_key, LoginWindow
+from login import RegisterWindow, _check_local_key, LoginWindow, delete_local_key
 from models import AnalysisReport, DecodeResult, ArchiveException
 
-VERSION = (0, 3, 0)
+VERSION = (0, 3, 1)
 current_version_str = version_to_string(VERSION)
 if getattr(sys, "frozen", False):
     BASEDIR = os.path.dirname(sys.executable)
@@ -167,7 +167,19 @@ class PlatinaArchiveClient:
         else:
             self.decoder_name = self.api_key.split("::")[0]
             self.log_message(f"{self.decoder_name}님, 환영합니다.")
-            self.archive = fetch_archive(self.api_key)
+            try:
+                self.archive = fetch_archive(self.api_key)
+            except ArchiveException as e:
+                self.log_error(str(e))
+                delete_local_key()
+                if messagebox.askyesno(
+                    "PLATiNA-ARCHiVE 로그인 / 등록",
+                    "계정 정보가 등록되어 있지 않습니다, 새로운 디코더로 등록하시겠습니까? (아니오 선택시 로그인 창으로 이동됩니다.)",
+                ):
+                    RegisterWindow(self.app, self._handle_successful_register)
+                else:
+                    LoginWindow(self.app, self._handle_successful_login)
+
         self.load_db()
 
     def _handle_successful_register(self, name: str, api_key: str):

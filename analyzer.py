@@ -771,31 +771,35 @@ def version_to_string(version: tuple[int, int, int]):
 def fetch_archive(api_key: str) -> dict[str, DecodeResult]:
     archive_endpoint = "https://www.platina-archive.app/api/v1/get_archive"
     headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
-    res = requests.post(archive_endpoint, headers=headers)
-    archive_json = res.json()
-    archive = {}
-    for arc in archive_json:
-        song_id = arc.get("song_id")
-        line = arc.get("line")
-        difficulty = arc.get("difficulty")
-        level = arc.get("level")
-        key = f"{song_id}|{line}|{difficulty}|{level}"
-        decoded_at = datetime.fromisoformat(arc.get("decoded_at")).astimezone(
-            timezone.utc
-        )
-        archive[key] = DecodeResult(
-            song_id,
-            line,
-            difficulty,
-            level,
-            arc.get("judge"),
-            arc.get("score"),
-            arc.get("patch"),
-            decoded_at,
-            arc.get("is_full_combo"),
-            arc.get("is_max_patch"),
-        )
-    return archive
+    try:
+        res = requests.post(archive_endpoint, headers=headers)
+        res.raise_for_status()
+        archive_json = res.json()
+        archive = {}
+        for arc in archive_json:
+            song_id = arc.get("song_id")
+            line = arc.get("line")
+            difficulty = arc.get("difficulty")
+            level = arc.get("level")
+            key = f"{song_id}|{line}|{difficulty}|{level}"
+            decoded_at = datetime.fromisoformat(arc.get("decoded_at")).astimezone(
+                timezone.utc
+            )
+            archive[key] = DecodeResult(
+                song_id,
+                line,
+                difficulty,
+                level,
+                arc.get("judge"),
+                arc.get("score"),
+                arc.get("patch"),
+                decoded_at,
+                arc.get("is_full_combo"),
+                arc.get("is_max_patch"),
+            )
+        return archive
+    except requests.exceptions.HTTPError:
+        raise ArchiveException("계정 정보 오류")
 
 
 def fetch_latest_client_version() -> tuple[int, int, int]:

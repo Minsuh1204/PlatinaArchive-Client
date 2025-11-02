@@ -9,6 +9,7 @@ import requests
 
 keyring.set_keyring(Windows.WinVaultKeyring())
 KEYRING_SERVICE_ID = "PlatinaArchiveClient"
+KEYRING_USER_ID = "main_api_key"
 
 if getattr(sys, "frozen", False):
     base_dir = os.path.dirname(sys.executable)
@@ -17,7 +18,11 @@ else:
 
 
 def _check_local_key():
-    return keyring.get_password(KEYRING_SERVICE_ID, "main_api_key")
+    return keyring.get_password(KEYRING_SERVICE_ID, KEYRING_USER_ID)
+
+
+def delete_local_key():
+    keyring.delete_password(KEYRING_SERVICE_ID, KEYRING_USER_ID)
 
 
 class LoginWindow(tk.Toplevel):
@@ -76,7 +81,7 @@ class LoginWindow(tk.Toplevel):
             api_key = data.get("key")
 
             if api_key:
-                keyring.set_password(KEYRING_SERVICE_ID, "main_api_key", api_key)
+                keyring.set_password(KEYRING_SERVICE_ID, KEYRING_USER_ID, api_key)
                 self.destroy()
                 self.success_callback(name, api_key)
             else:
@@ -152,7 +157,7 @@ class RegisterWindow(tk.Toplevel):
             api_key = data.get("key")
 
             if api_key:
-                keyring.set_password(KEYRING_SERVICE_ID, "main_api_key", api_key)
+                keyring.set_password(KEYRING_SERVICE_ID, KEYRING_USER_ID, api_key)
                 self.destroy()
                 self.success_callback(name, api_key)
             else:
