@@ -24,7 +24,7 @@ from analyzer import (
 from login import RegisterWindow, _check_local_key, LoginWindow, delete_local_key
 from models import AnalysisReport, DecodeResult, ArchiveException
 
-VERSION = (0, 3, 2)
+VERSION = (0, 3, 3)
 current_version_str = version_to_string(VERSION)
 if getattr(sys, "frozen", False):
     BASEDIR = os.path.dirname(sys.executable)
@@ -151,8 +151,9 @@ class PlatinaArchiveClient:
         if latest_version > VERSION:
             latest_version_str = version_to_string(latest_version)
             self.log_message(
-                f"새로운 클라이언트 버전이 탐지되었습니다, 업데이트를 권장드립니다. ({current_version_str} -> {latest_version_str})"
+                f"새로운 클라이언트 버전이 탐지되었습니다, 업데이트를 권장드립니다. ({latest_version_str})"
             )
+            self.log_message("다운로드: https://platina-archive.app/client")
         else:
             self.log_message("클라이언트가 최신 버전입니다.")
 
