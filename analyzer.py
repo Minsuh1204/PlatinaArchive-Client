@@ -768,9 +768,9 @@ def version_to_string(version: tuple[int, int, int]):
     return f"v{version[0]}.{version[1]}.{version[2]}"
 
 
-def fetch_archive(api_key: str) -> dict[str, DecodeResult]:
-    archive_endpoint = "https://www.platina-archive.app/api/v1/get_archive"
-    headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
+def fetch_archive(b64_api_key: str) -> dict[str, DecodeResult]:
+    archive_endpoint = "https://www.platina-archive.app/api/v2/get_archive"
+    headers = {"X-API-Key": b64_api_key, "Content-Type": "application/json"}
     try:
         res = requests.post(archive_endpoint, headers=headers)
         res.raise_for_status()

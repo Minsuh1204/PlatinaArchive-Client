@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import math
 import sys
 import os
@@ -165,10 +166,13 @@ class PlatinaArchiveClient:
                 LoginWindow(self.app, self._handle_successful_login)
 
         else:
+            self.b64_api_key: str = base64.b64encode(
+                self.api_key.encode("utf-8")
+            ).decode("utf-8")
             self.decoder_name = self.api_key.split("::")[0]
             self.log_message(f"{self.decoder_name}님, 환영합니다.")
             try:
-                self.archive = fetch_archive(self.api_key)
+                self.archive = fetch_archive(self.b64_api_key)
             except ArchiveException as e:
                 self.log_error(str(e))
                 delete_local_key()
@@ -376,10 +380,10 @@ class PlatinaArchiveClient:
             self.log_message(f"패론치까지 단 {need_perfect_high}개!")
         # report higher score to the server
         update_archive_endpoint = (
-            "https://www.platina-archive.app/api/v1/update_archive"
+            "https://www.platina-archive.app/api/v2/update_archive"
         )
         headers = {
-            "X-API-Key": self.api_key,
+            "X-API-Key": self.b64_api_key,
             "Content-Type": "application/json",
         }
         requests.post(update_archive_endpoint, json=new_archive.json(), headers=headers)
