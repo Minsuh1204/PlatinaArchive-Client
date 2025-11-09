@@ -745,7 +745,7 @@ class ScreenshotAnalyzer:
             matched_song,
             calculated_score,
             calculated_judge_rate,
-            calculated_patch,
+            patch_ocr,
             lines,
             difficulty_str,
             level_int,

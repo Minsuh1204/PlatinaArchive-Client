@@ -24,7 +24,7 @@ from analyzer import (
 from login import RegisterWindow, _check_local_key, LoginWindow, delete_local_key
 from models import AnalysisReport, DecodeResult, ArchiveException
 
-VERSION = (0, 3, 3)
+VERSION = (0, 3, 4)
 current_version_str = version_to_string(VERSION)
 if getattr(sys, "frozen", False):
     BASEDIR = os.path.dirname(sys.executable)
