@@ -190,13 +190,19 @@ class PlatinaArchiveClient:
     def _handle_successful_register(self, name: str, api_key: str):
         self.decoder_name = name
         self.api_key = api_key
-        self.archive = fetch_archive(self.api_key)
+        self.b64_api_key = base64.b64encode(self.api_key.encode("utf-8")).decode(
+            "utf-8"
+        )
+        self.archive = fetch_archive(self.b64_api_key)
         self.log_message(f"등록 성공. 환영합니다, {name}님.")
 
     def _handle_successful_login(self, name: str, api_key: str):
         self.decoder_name = name
         self.api_key = api_key
-        self.archive = fetch_archive(self.api_key)
+        self.b64_api_key = base64.b64encode(self.api_key.encode("utf-8")).decode(
+            "utf-8"
+        )
+        self.archive = fetch_archive(self.b64_api_key)
         self.log_message(f"로그인 성공. 돌아오신걸 환영합니다, {name}님.")
 
     def _setup_global_hotkey(self):
